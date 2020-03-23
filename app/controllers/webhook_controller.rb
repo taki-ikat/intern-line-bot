@@ -24,19 +24,31 @@ class WebhookController < ApplicationController
       when Line::Bot::Event::Message
         case event.type
         when Line::Bot::Event::MessageType::Text
-          if event.message['text'].eql?('鳥')
-            birds = {
+          if event.message['text'].eql?('日本') then
+            message = {
               type: 'text',
-              text: 'Bird images'
+              text: '東京'
             }
-            client.reply_message(event['replyToken'], birds)
+          elsif event.message['text'].eql?('コスタリカ') then
+            message = {
+              type: 'text',
+              text: 'サンホセ'
+            }
+          elsif event.message['text'].eql?('Japan') then
+            message = {
+              type: 'text',
+              text: '鋭意実装中'
+            }
           else
+            # Nager.Dateをコール
+            # api/v2/AvailableCountriesで辞書型リストゲット
+            # contrycodes={'code': 'name'}
             message = {
               type: 'text',
               text: event.message['text']
             }
-            client.reply_message(event['replyToken'], message)
           end
+          client.reply_message(event['replyToken'], message)
         when Line::Bot::Event::MessageType::Image, Line::Bot::Event::MessageType::Video
           response = client.get_message_content(event.message['id'])
           tf = Tempfile.open("content")
