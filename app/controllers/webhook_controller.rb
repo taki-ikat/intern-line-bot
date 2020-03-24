@@ -1,6 +1,4 @@
 require 'line/bot'
-require 'httpclient'
-require 'json'
 
 class WebhookController < ApplicationController
   protect_from_forgery except: [:callback] # CSRF対策無効化
