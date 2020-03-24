@@ -1,4 +1,6 @@
 require 'line/bot'
+require 'httpclient'
+require 'json'
 
 class WebhookController < ApplicationController
   protect_from_forgery except: [:callback] # CSRF対策無効化
@@ -34,10 +36,32 @@ class WebhookController < ApplicationController
               type: 'text',
               text: 'サンホセ'
             }
-          elsif event.message['text'].eql?('Japan') then
+          elsif event.message['text'].eql?('JP') then
+            # 取得先URL
+            url_holiday = 'https://date.nager.at/Api/v1/Get/'
+
+            params = {
+              countrycode = 'JP'
+              year = '2020'
+            }
+
+            client = HTTPClient.new
+            request = client.get(url_holiday, params)
+            response = JSON.parse(require.body)
+
+            # 祝日保管用Array
+            holiday_list = []
+            # 応答メッセージ
+            res_holiday = {}
+
+            response.each do |res|
+              holiday_list.append res["name"]
+              res_holiday += res["name"]
+              res_holiday += "¥n"
+            end
             message = {
               type: 'text',
-              text: '鋭意実装中'
+              text: res_holiday
             }
           else
             # Nager.Dateをコール
