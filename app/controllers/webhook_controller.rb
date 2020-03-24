@@ -1,5 +1,14 @@
 require 'line/bot'
 
+# 返すテキストメッセージの設定
+def set_message(text)
+  message = {
+    type: 'text',
+    text: text
+  }
+  return message
+end
+
 class WebhookController < ApplicationController
   protect_from_forgery except: [:callback] # CSRF対策無効化
 
@@ -24,21 +33,15 @@ class WebhookController < ApplicationController
       when Line::Bot::Event::Message
         case event.type
         when Line::Bot::Event::MessageType::Text
-          if event.message['text'].eql?('日本') then
-            message = {
-              type: 'text',
-              text: '東京'
-            }
-          elsif event.message['text'].eql?('コスタリカ') then
-            message = {
-              type: 'text',
-              text: 'サンホセ'
-            }
-          else
-            message = {
-              type: 'text',
-              text: event.message['text']
-            }
+          # 入力したテキストの取得
+          inputted_text = event.message['text']
+          case inputted_text
+          when '日本'
+            message = set_message('東京')
+          when'コスタリカ'
+            message = set_message('サンホセ')
+          else  # オウム返し
+            message = set_message(inputted_text)
           end
           client.reply_message(event['replyToken'], message)
         when Line::Bot::Event::MessageType::Image, Line::Bot::Event::MessageType::Video
