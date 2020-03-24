@@ -1,14 +1,5 @@
 require 'line/bot'
 
-# 返すテキストメッセージの設定
-def set_message(text)
-  message = {
-    type: 'text',
-    text: text
-  }
-  return message
-end
-
 class WebhookController < ApplicationController
   protect_from_forgery except: [:callback] # CSRF対策無効化
 
@@ -52,5 +43,13 @@ class WebhookController < ApplicationController
       end
     }
     head :ok
+  end
+
+  # 返すテキストメッセージの設定
+  def set_message(text)
+    message = {
+      type: 'text',
+      text: text
+    }
   end
 end
