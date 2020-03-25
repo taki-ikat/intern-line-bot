@@ -72,7 +72,7 @@ class WebhookController < ApplicationController
           else
             country = "name"       # それ以外は英語で返す
           end
-          return holidays.map {|holiday| "#{holiday["date"]}:#{holiday[country]}\n"}.join.chomp!
+          return holidays.map {|holiday| "#{holiday["date"]}:#{holiday[country]}"}.join("\n")
 
         when Net::HTTPNotFound
           "存在しない国コードです"
