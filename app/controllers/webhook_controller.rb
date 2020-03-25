@@ -26,7 +26,7 @@ class WebhookController < ApplicationController
         case event.type
         when Line::Bot::Event::MessageType::Text
           # 入力した国コードから祝日リストを取得し，LINEの応答メッセージとしてセットしてLINE上に返す．
-          client.reply_message(event['replyToken'], set_message(get_holidays(event.message['text'], '2020')))
+          client.reply_message(event['replyToken'], generate_message(fetch_holidays(event.message['text'], Time.zone.today.year)))
         when Line::Bot::Event::MessageType::Image, Line::Bot::Event::MessageType::Video
           response = client.get_message_content(event.message['id'])
           tf = Tempfile.open("content")
@@ -40,8 +40,7 @@ class WebhookController < ApplicationController
   private
 
   # 返すテキストメッセージの設定
-  # レベル3でおそらく複数回使用するので残しています
-  def set_message(text)
+  def generate_message(text)
     {
       type: 'text',
       text: text
@@ -49,13 +48,13 @@ class WebhookController < ApplicationController
   end
 
   # 国コードと年に該当する祝日リストを返す
-  def get_holidays(countrycode, year, retry_count = 10)
-    raise ArgumentError, 'too many HTTP redirects' if retry_count == 0
+  MAX_RETRY_COUNT = 3
+  def fetch_holidays(countrycode, year, retry_count = MAX_RETRY_COUNT)
+    return 'タイムアウトしました。\n時間をおいてみるとうまくいくかもしれません。' if retry_count <= 0
 
     begin
       uri = URI.parse("https://date.nager.at/Api/v1/Get/#{countrycode}/#{year}")
-      holidays_list = ""    # returnする祝日リスト（改行タグで区切られた文字列）
-  
+
       response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') do |http|
         http.open_timeout = 5
         http.read_timeout = 10
@@ -71,25 +70,23 @@ class WebhookController < ApplicationController
           else
             country = "name"       # それ以外は英語で返す
           end
-          holidays.each { |holiday|
-            holidays_list << "#{holiday["date"]}:#{holiday[country]}\n"
-          }
-          holidays_list.chomp!        # 最後の改行タグ削除
-          return holidays_list
+          return holidays.map {|holiday| "#{holiday["date"]}:#{holiday[country]}\n"}.join.chomp!
 
-        when Net::HTTPRedirection
-          location = response['location']
-          Rails.logger.error(warn "redirected to #{location}")
-          get_holidays(countrycode, year, retry_count - 1)
+        when Net::HTTPNotFound
+          "存在しない国コードです"
 
         else
-          Rails.logger.error([uri.to_s, response.value].join(" : "))
-          "HTTP接続エラーです。\nお手数ですが、運営元にお問い合わせください。"
+          Rails.logger.error([uri.to_s, response].join(" : "))
+          "調子が悪いみたいです。\n時間をおいてみるとうまくいくかもしれません。"
       end
+
+    rescue Net::OpenTimeout => e
+      get_holidays(countrycode, year, retry_count - 1)
 
     rescue => e
       Rails.logger.error(e.class)
       Rails.logger.error(e.message)
+      Rails.logger.error(e.backtrace.join("\n"))
       "入力値が正しくありません"
     end
   end
