@@ -39,6 +39,9 @@ class WebhookController < ApplicationController
 
   private
 
+  MAX_RETRY_COUNT = 3
+  API_URL = "https://date.nager.at/Api"
+
   # 返すテキストメッセージの設定
   def generate_message(text)
     {
@@ -48,12 +51,11 @@ class WebhookController < ApplicationController
   end
 
   # 国コードと年に該当する祝日リストを返す
-  MAX_RETRY_COUNT = 3
   def fetch_holidays(countrycode, year, retry_count = MAX_RETRY_COUNT)
-    return 'タイムアウトしました。\n時間をおいてみるとうまくいくかもしれません。' if retry_count <= 0
+    return "タイムアウトしました。\n時間をおいてみるとうまくいくかもしれません。" if retry_count <= 0
 
     begin
-      uri = URI.parse("https://date.nager.at/Api/v1/Get/#{countrycode}/#{year}")
+      uri = URI.parse("#{API_URL}/v1/Get/#{countrycode}/#{year}")
 
       response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') do |http|
         http.open_timeout = 5
@@ -81,7 +83,7 @@ class WebhookController < ApplicationController
       end
 
     rescue Net::OpenTimeout => e
-      get_holidays(countrycode, year, retry_count - 1)
+      fetch_holidays(countrycode, year, retry_count - 1)
 
     rescue => e
       Rails.logger.error(e.class)
