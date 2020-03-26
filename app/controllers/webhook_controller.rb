@@ -26,7 +26,7 @@ class WebhookController < ApplicationController
       when Line::Bot::Event::Message
         case event.type
         when Line::Bot::Event::MessageType::Text
-          countrycode, year = return_countrycode_year(event.message['text'])
+          countrycode, year = return_countrycode_and_year(event.message['text'])
           if countrycode.nil?
             message = "入力フォーマットが正しくありません"
           else
@@ -60,7 +60,7 @@ class WebhookController < ApplicationController
   end
 
   # 入力フォーマットを判定し，国コードと年を返す
-  def return_countrycode_year(text)
+  def return_countrycode_and_year(text)
     case NKF.nkf('-w -Z1 -Z4', text)      # 全角はスペース含めてすべて半角にする
     when /([A-Za-z]{2})\s([0-9]{4})/      # フォーマット："国コード yyyy"
       countrycode, year = $1, $2
