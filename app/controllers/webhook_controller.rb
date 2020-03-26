@@ -50,6 +50,8 @@ class WebhookController < ApplicationController
 
   MAX_RETRY_COUNT = 3
   API_URL = "https://date.nager.at/Api"
+  COUNTRY_CODE = /([A-Za-z]{2})/
+  YEAR = /([0-9]{4})/
 
   # 返すテキストメッセージの設定
   def generate_message(text)
@@ -62,9 +64,9 @@ class WebhookController < ApplicationController
   # 入力フォーマットを判定し，国コードと年を返す
   def return_countrycode_and_year(text)
     case NKF.nkf('-w -Z1 -Z4', text)      # 全角はスペース含めてすべて半角にする
-    when /([A-Za-z]{2})\s([0-9]{4})/      # フォーマット："国コード yyyy"
+    when /#{COUNTRY_CODE}\s*#{YEAR}/      # フォーマット："国コード yyyy"
       countrycode, year = $1, $2
-    when /([A-Za-z]{2})/                  # フォーマット："国コード"
+    when /#{COUNTRY_CODE}/                # フォーマット："国コード"
       countrycode, year = $1, Time.zone.today.year
     else
       countrycode, year = nil, nil 
