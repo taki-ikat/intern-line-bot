@@ -1,5 +1,6 @@
-require 'line/bot'
+require 'nkf'
 require 'json'
+require 'line/bot'
 
 class WebhookController < ApplicationController
   protect_from_forgery except: [:callback] # CSRF対策無効化
@@ -25,8 +26,16 @@ class WebhookController < ApplicationController
       when Line::Bot::Event::Message
         case event.type
         when Line::Bot::Event::MessageType::Text
-          # 入力した国コードから祝日リストを取得し，LINEの応答メッセージとしてセットしてLINE上に返す．
-          client.reply_message(event['replyToken'], generate_message(fetch_holidays(event.message['text'], Time.zone.today.year)))
+          countrycode, year = return_countrycode_year(event.message['text'])
+          if countrycode.nil?
+            message = "入力フォーマットが正しくありません"
+          else
+            # 入力した国コードから祝日一覧を文字列で取得
+            message = fetch_holidays(countrycode, year)
+          end
+          # LINEの応答メッセージを生成して送信する
+          client.reply_message(event['replyToken'], generate_message(message))
+
         when Line::Bot::Event::MessageType::Image, Line::Bot::Event::MessageType::Video
           response = client.get_message_content(event.message['id'])
           tf = Tempfile.open("content")
@@ -35,7 +44,7 @@ class WebhookController < ApplicationController
       end
     }
     head :ok
-  end
+ end
 
   private
 
@@ -50,7 +59,19 @@ class WebhookController < ApplicationController
     }
   end
 
-  # 国コードと年に該当する祝日リストを返す
+  # 入力フォーマットを判定し，国コードと年を返す
+  def return_countrycode_year(text)
+    case NKF.nkf('-w -Z1 -Z4', text)      # 全角はスペース含めてすべて半角にする
+    when /([A-Za-z]{2})\s([0-9]{4})/      # フォーマット："国コード yyyy"
+      countrycode, year = $1, $2
+    when /([A-Za-z]{2})/                  # フォーマット："国コード"
+      countrycode, year = $1, Time.zone.today.year
+    else
+      countrycode, year = nil, nil 
+    end
+  end
+
+  # 国コードと年に該当する祝日一覧を文字列で返す
   def fetch_holidays(countrycode, year, retry_count = MAX_RETRY_COUNT)
     return "タイムアウトしました。\n時間をおいてみるとうまくいくかもしれません。" if retry_count <= 0
 
@@ -67,10 +88,11 @@ class WebhookController < ApplicationController
         when Net::HTTPSuccess
           holidays = JSON.parse(response.body)
           # 祝日名のキー設定
-          if countrycode == 'JP'   # 日本なら日本語で返す
+          case countrycode
+          when /JP/i              # 日本なら日本語で返す
             country = "localName"
           else
-            country = "name"       # それ以外は英語で返す
+            country = "name"      # それ以外は英語で返す
           end
           return holidays.map {|holiday| "#{holiday["date"]}:#{holiday[country]}"}.join("\n")
 
