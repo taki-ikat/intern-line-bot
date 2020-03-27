@@ -26,23 +26,29 @@ class WebhookController < ApplicationController
       when Line::Bot::Event::Message
         case event.type
         when Line::Bot::Event::MessageType::Text
-          # 一旦英数字以外があるかチェック→あったら"入力値が正しくありません"
           text = NKF.nkf('-w -Z1 -Z4', event.message['text'])     # 全角はスペース含めてすべて半角にする
-          messages = []    # 返すメッセージ
           case text
           when /[^(-w, \s)]/    # 英数字とスペース以外を含んでいる場合
-            messages << "半角英数字で入力してください。\n#{MESSAGE_HELP}"
+            reply = generate_message(["半角英数字で入力してください。\n#{MESSAGE_HELP}"])
           when /\Ahelp\z/i
             # 説明文を返す
-            messages << "入力はすべて半角英数字でおこなってください。\n年を省略すると現在の年が適応されます。\n＜コマンド＞\n1. help\nこの説明が見られます。\n2. all\n対応する国名・国コードが確認できます。\n3. 年（数字4桁） 国コード（英字2字）または国名\n該当する祝日リストを返します。\n例1：2010 US\n例2：1964 Japan"
+            reply = generate_message([MESSAGE_HELP_TEXT])
           when /\Aall\z/i
             # すべての国名・国コードを返す
-            messages << generate_text_with_all_countries()
+            reply = generate_message([generate_text_with_all_countries()])
+          when /\Abird\z/i
+            reply = fetch_image_url(BIRD)
+          when /\Adog\z/i
+            reply = fetch_image_url(DOG)
+          when /\Acat\z/i
+            reply = fetch_image_url(CAT)
           else
+            messages = []    # 返すメッセージ
             # 入力メッセージを国名候補と年に分割
             year, country = split_text_message(text)
             # 入力年が数字4桁か判定
             unless year =~ /\A#{YEAR}\z/
+              year = nil
               messages << "入力年は数字4桁で入力してください。\n#{MESSAGE_HELP}"
             end
             countries = fetch_all_countries()     # なんらかのエラーが起きた場合，その旨を文字列で返す
@@ -54,13 +60,16 @@ class WebhookController < ApplicationController
               if countrycode.nil?
                 messages << "入力した国名または国コードが正しくありません。\n#{MESSAGE_HELP}"
               else
-                # 入力した国コードから祝日一覧を文字列で取得
-                messages << fetch_holidays(countrycode, year)
+                unless year.nil?
+                  # 入力した国コードから祝日一覧を文字列で取得
+                  messages << fetch_holidays(countrycode, year)
+                end
               end
             end
+            reply = generate_message(messages)
           end
           # LINEの応答メッセージを生成して送信する
-          client.reply_message(event['replyToken'], generate_message(messages))
+          client.reply_message(event['replyToken'], reply)
 
         when Line::Bot::Event::MessageType::Image, Line::Bot::Event::MessageType::Video
           response = client.get_message_content(event.message['id'])
@@ -78,10 +87,31 @@ class WebhookController < ApplicationController
   MAX_RETRY_COUNT = 3
   API_URL = "https://date.nager.at/Api"
   YEAR = /([0-9]{4})/
+  MESSAGE_HELP_TEXT = <<-EOS
+  入力はすべて半角英数字でおこなってください。
+  ※過去または未来の祝日は必ずしも正しいとは限りません。
+  
+  ＜コマンド＞
+  1. help
+  この説明が見られます。
+  2. all
+  対応する国名・国コードが確認できます。
+  3. 年（数字4桁） 国コード（英字2字）または国名
+  該当する祝日リストを返します。
+  年を省略すると現在の年が適用されます。
+  例1：2010 US
+  例2：1964 Japan
+
+  ?. 隠しコマンド
+  鳥・犬・猫それぞれの英単語を入力すると癒されます。
+  EOS
   MESSAGE_HELP = "使い方の確認にはhelpと入力してください。"
   MESSAGE_TAKETIME = "時間をおいてみるとうまくいくかもしれません。"
   MESSAGE_TIMEOUT = "タイムアウトしました。\n#{MESSAGE_TAKETIME}"
   MESSAGE_NOTWORK = "調子が悪いみたいです。\n#{MESSAGE_TAKETIME}"
+  BIRD = "birds"
+  DOG = "shibes"
+  CAT = "cats"
 
   def http_start(uri)
     response = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') do |http|
@@ -192,6 +222,39 @@ class WebhookController < ApplicationController
       Rails.logger.error(e.message)
       Rails.logger.error(e.backtrace.join("\n"))
       "入力値が正しくありません"
+    end
+  end
+
+  # 隠しコマンド
+  # 鳥・犬・猫の画像を返す
+  def fetch_image_url(type, retry_count = MAX_RETRY_COUNT)
+    return MESSAGE_TIMEOUT if retry_count <= 0
+    begin
+      uri = URI.parse("http://shibe.online/api/#{type}")
+      response = http_start(uri)
+
+      case response
+      when Net::HTTPSuccess
+        # すべての国名と国コードをhashで取得
+        image_url = JSON.parse(response.body)[0]
+        message = {
+          type: 'image',
+          originalContentUrl: image_url,
+          previewImageUrl: image_url
+        }
+      else
+        Rails.logger.error([uri.to_s, response].join(" : "))
+        MESSAGE_NOTWORK
+      end
+
+    rescue Net::OpenTimeout => e
+      fetch_image_url(type, retry_count - 1)
+
+    rescue => e
+      Rails.logger.error(e.class)
+      Rails.logger.error(e.message)
+      Rails.logger.error(e.backtrace.join("\n"))
+      MESSAGE_NOTWORK
     end
   end
 end
