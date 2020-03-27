@@ -90,6 +90,7 @@ class WebhookController < ApplicationController
   MESSAGE_HELP_TEXT = <<-EOS
   入力はすべて半角英数字でおこなってください。
   ※過去または未来の祝日は必ずしも正しいとは限りません。
+  
   ＜コマンド＞
   1. help
   この説明が見られます。
