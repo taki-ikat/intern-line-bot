@@ -48,6 +48,7 @@ class WebhookController < ApplicationController
             year, country = split_text_message(text)
             # 入力年が数字4桁か判定
             unless year =~ /\A#{YEAR}\z/
+              year = nil
               messages << "入力年は数字4桁で入力してください。\n#{MESSAGE_HELP}"
             end
             countries = fetch_all_countries()     # なんらかのエラーが起きた場合，その旨を文字列で返す
@@ -59,8 +60,10 @@ class WebhookController < ApplicationController
               if countrycode.nil?
                 messages << "入力した国名または国コードが正しくありません。\n#{MESSAGE_HELP}"
               else
-                # 入力した国コードから祝日一覧を文字列で取得
-                messages << fetch_holidays(countrycode, year)
+                unless year.nil?
+                  # 入力した国コードから祝日一覧を文字列で取得
+                  messages << fetch_holidays(countrycode, year)
+                end
               end
             end
             reply = generate_message(messages)
