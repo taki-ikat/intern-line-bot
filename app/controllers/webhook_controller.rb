@@ -34,13 +34,7 @@ class WebhookController < ApplicationController
             messages << "半角英数字で入力してください。\n#{MESSAGE_HELP}"
           when /\Ahelp\z/i
             # 説明文を返す
-            messages << "入力はすべて半角英数字でおこなってください。\n
-              年を省略すると現在の年が適応されます。\n
-              ※過去および未来の祝日は必ずしも正しいとは限りません。\n
-              ＜コマンド＞\n1. help\nこの説明が見られます。\n
-              2. all\n対応する国名・国コードが確認できます。\n
-              3. 年（数字4桁） 国コード（英字2字）または国名\n該当する祝日リストを返します。\n
-              例1：2010 US\n例2：1964 Japan"
+            messages << "入力はすべて半角英数字でおこなってください。\n年を省略すると現在の年が適応されます。\n＜コマンド＞\n1. help\nこの説明が見られます。\n2. all\n対応する国名・国コードが確認できます。\n3. 年（数字4桁） 国コード（英字2字）または国名\n該当する祝日リストを返します。\n例1：2010 US\n例2：1964 Japan"
           when /\Aall\z/i
             # すべての国名・国コードを返す
             messages << generate_text_with_all_countries()
